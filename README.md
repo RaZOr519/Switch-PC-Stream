@@ -94,8 +94,10 @@ Benchmarked on **1280x720 (Native Switch Lite Resolution)** over local Wi-Fi:
 ### 1. Requirements on Gaming PC
 * **Windows 10 / 11**
 * **Python 3.10+**
+* **ViGEmBus Driver (Required for Virtual Xbox 360 Controller)**:
+  * Installing `vgamepad` uses [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases). If you haven't installed ViGEmBus driver on your PC yet, download and install the installer from the official release page: [Download ViGEmBus_Setup.exe](https://github.com/nefarius/ViGEmBus/releases/latest).
 
-Install required dependencies:
+Install required Python dependencies:
 ```bash
 pip install starlette uvicorn opencv-python pillow numpy websockets dxcam vgamepad pynput pygame
 ```
