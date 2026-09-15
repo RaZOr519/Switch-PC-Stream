@@ -7,6 +7,7 @@
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)
 ![Resolution](https://img.shields.io/badge/Resolution-1280x720%20%40%2060FPS-orange.svg)
 ![Platform](https://img.shields.io/badge/Platform-Nintendo%20Switch%20Lite%20%28Stock%2FUnmodded%29-red.svg)
+[![Ko-fi](https://img.shields.io/badge/Support%20Me-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/razor519)
 
 ---
 
@@ -153,6 +154,14 @@ This project is an independent open-source research demonstration of low-latency
 * **Nintendo Switch** and **Nintendo Switch Lite** are registered trademarks of Nintendo Co., Ltd.
 * This project is not affiliated with, endorsed by, or sponsored by Nintendo Co., Ltd.
 * All code in this repository is 100% original and uses public APIs.
+
+---
+
+## ❤️ Support & Donate
+
+If you enjoy this project or found it helpful, consider supporting further development on Ko-fi!
+
+<a href="https://ko-fi.com/razor519" target="_blank"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me A Coffee on Ko-fi"></a>
 
 ---
 
