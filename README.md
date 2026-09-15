@@ -14,11 +14,13 @@
 
 Check out live video test runs of the Nintendo Switch Lite streaming at 720p @ 60 FPS over local network:
 
-https://github.com/user-attachments/assets/demo1.mp4
+* 🎬 **[Watch Demo Video 1 (Gameplay Test)](https://github.com/RaZOr519/Switch-PC-Stream/blob/main/media/demo1.mp4)**
+* 🎬 **[Watch Demo Video 2 (Input & Latency Test)](https://github.com/RaZOr519/Switch-PC-Stream/blob/main/media/demo2.mp4)**
 
-https://github.com/user-attachments/assets/demo2.mp4
-
-> *Note: Videos are hosted in the [`media/`](media/) folder (`media/demo1.mp4` and `media/demo2.mp4`).*
+<p align="center">
+  <video src="https://raw.githubusercontent.com/RaZOr519/Switch-PC-Stream/main/media/demo1.mp4" controls width="48%"></video>
+  <video src="https://raw.githubusercontent.com/RaZOr519/Switch-PC-Stream/main/media/demo2.mp4" controls width="48%"></video>
+</p>
 
 ---
 
