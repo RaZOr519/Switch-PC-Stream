@@ -1,0 +1,496 @@
+import asyncio
+import io
+import json
+import math
+import time
+import socket
+import struct
+import numpy as np
+import cv2
+from PIL import ImageGrab
+
+from starlette.applications import Starlette
+from starlette.responses import Response, StreamingResponse, HTMLResponse, FileResponse
+from starlette.routing import Route, WebSocketRoute, Mount
+from starlette.staticfiles import StaticFiles
+from starlette.websockets import WebSocket, WebSocketDisconnect
+import uvicorn
+
+# Global Configuration State
+class StreamState:
+    def __init__(self):
+        self.resolution = "720p"  # "360p", "480p", "720p"
+        self.fps = 30
+        self.quality = 50
+        self.mode = "synthetic"  # "synthetic" or "desktop"
+        self.render_method = "createImageBitmap"
+        
+        self.width = 1280
+        self.height = 720
+        self.frame_id = 0
+        self.start_time = time.time()
+        
+        # Bouncing ball state for synthetic mode
+        self.ball_x = 200.0
+        self.ball_y = 200.0
+        self.ball_vx = 320.0  # px/sec
+        self.ball_vy = 220.0  # px/sec
+        self.ball_radius = 40
+        
+        # Telemetry & Gamepad metrics
+        self.sent_frames = 0
+        self.bytes_sent = 0
+        self.last_stat_reset = time.time()
+        self.latest_gamepad = {
+            "connected": False,
+            "axes": [0.0, 0.0, 0.0, 0.0],
+            "buttons": [],
+            "timestamp": 0
+        }
+
+    def update_resolution(self, res_str):
+        self.resolution = res_str
+        if res_str == "360p":
+            self.width, self.height = 640, 360
+        elif res_str == "480p":
+            self.width, self.height = 854, 480
+        elif res_str == "720p":
+            self.width, self.height = 1280, 720
+        else:
+            self.width, self.height = 1280, 720
+        self.ball_radius = max(20, int(min(self.width, self.height) * 0.06))
+
+state = StreamState()
+
+try:
+    import vgamepad as vg
+    virtual_gamepad = vg.VX360Gamepad()
+    print("[VIRTUAL CONTROLLER] Xbox 360 Controller initialized successfully!")
+except Exception as e:
+    virtual_gamepad = None
+    print(f"[VIRTUAL CONTROLLER WARNING] Could not initialize vgamepad: {e}")
+
+try:
+    from pynput.keyboard import Key, Controller as KeyboardController
+    keyboard_controller = KeyboardController()
+    print("[KEYBOARD BRIDGE] Windows Keyboard Injection initialized successfully!")
+except Exception as e:
+    keyboard_controller = None
+    print(f"[KEYBOARD BRIDGE WARNING] Could not initialize pynput: {e}")
+
+active_pressed_keys = set()
+
+def update_virtual_controller(gp_data):
+    """Translate Switch Lite Gamepad API data to Virtual Xbox 360 Controller AND Windows Keyboard Events."""
+    axes = gp_data.get("axes", [0, 0, 0, 0])
+    buttons = gp_data.get("buttons", [])
+    
+    # --- 1. XBOX 360 CONTROLLER INJECTION (vgamepad) ---
+    if virtual_gamepad:
+        try:
+            lx = float(axes[0]) if len(axes) > 0 else 0.0
+            ly = float(axes[1]) if len(axes) > 1 else 0.0
+            if abs(lx) < 0.12: lx = 0.0
+            if abs(ly) < 0.12: ly = 0.0
+            virtual_gamepad.left_joystick_float(x_value_float=lx, y_value_float=-ly)
+            
+            rx = float(axes[2]) if len(axes) > 2 else 0.0
+            ry = float(axes[3]) if len(axes) > 3 else 0.0
+            if abs(rx) < 0.12: rx = 0.0
+            if abs(ry) < 0.12: ry = 0.0
+            virtual_gamepad.right_joystick_float(x_value_float=rx, y_value_float=-ry)
+            
+            button_map = {
+                0: vg.XUSB_BUTTON.XUSB_GAMEPAD_A,          # Switch B -> Xbox A
+                1: vg.XUSB_BUTTON.XUSB_GAMEPAD_B,          # Switch A -> Xbox B
+                2: vg.XUSB_BUTTON.XUSB_GAMEPAD_X,          # Switch Y -> Xbox X
+                3: vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,          # Switch X -> Xbox Y
+                4: vg.XUSB_BUTTON.XUSB_LEFT_SHOULDER,      # Switch L -> Xbox LB
+                5: vg.XUSB_BUTTON.XUSB_RIGHT_SHOULDER,     # Switch R -> Xbox RB
+                8: vg.XUSB_BUTTON.XUSB_BACK,               # Switch - -> Xbox BACK
+                9: vg.XUSB_BUTTON.XUSB_START,              # Switch + -> Xbox START
+                10: vg.XUSB_BUTTON.XUSB_LEFT_THUMB,        # Switch L3 -> Xbox LS
+                11: vg.XUSB_BUTTON.XUSB_RIGHT_THUMB,       # Switch R3 -> Xbox RS
+                12: vg.XUSB_BUTTON.XUSB_DPAD_UP,           # D-Pad Up
+                13: vg.XUSB_BUTTON.XUSB_DPAD_DOWN,         # D-Pad Down
+                14: vg.XUSB_BUTTON.XUSB_DPAD_LEFT,         # D-Pad Left
+                15: vg.XUSB_BUTTON.XUSB_DPAD_RIGHT         # D-Pad Right
+            }
+            
+            for sw_idx, xbox_btn in button_map.items():
+                if sw_idx < len(buttons) and buttons[sw_idx]:
+                    virtual_gamepad.press_button(button=xbox_btn)
+                else:
+                    virtual_gamepad.release_button(button=xbox_btn)
+                    
+            zl_pressed = (len(buttons) > 6 and buttons[6]) or (len(axes) > 4 and axes[4] > 0.5)
+            zr_pressed = (len(buttons) > 7 and buttons[7]) or (len(axes) > 5 and axes[5] > 0.5)
+            
+            virtual_gamepad.left_trigger_float(value_float=1.0 if zl_pressed else 0.0)
+            virtual_gamepad.right_trigger_float(value_float=1.0 if zr_pressed else 0.0)
+            
+            virtual_gamepad.update()
+        except Exception as ex:
+            pass
+
+    # --- 2. WINDOWS KEYBOARD INJECTION (pynput) ---
+    if keyboard_controller:
+        try:
+            target_keys = set()
+            
+            lx = float(axes[0]) if len(axes) > 0 else 0.0
+            ly = float(axes[1]) if len(axes) > 1 else 0.0
+            
+            # Left / Right (Stick or D-Pad)
+            if lx < -0.3 or (len(buttons) > 14 and buttons[14]):
+                target_keys.add(Key.left)
+                target_keys.add('a')
+            if lx > 0.3 or (len(buttons) > 15 and buttons[15]):
+                target_keys.add(Key.right)
+                target_keys.add('d')
+                
+            # Up / Down (Stick or D-Pad)
+            if ly < -0.3 or (len(buttons) > 12 and buttons[12]):
+                target_keys.add(Key.up)
+                target_keys.add('w')
+            if ly > 0.3 or (len(buttons) > 13 and buttons[13]):
+                target_keys.add(Key.down)
+                target_keys.add('s')
+                
+            # Action Buttons
+            if (len(buttons) > 0 and buttons[0]) or (len(buttons) > 1 and buttons[1]) or (len(buttons) > 7 and buttons[7]):
+                target_keys.add(Key.space)
+                target_keys.add('z')
+            if (len(buttons) > 2 and buttons[2]) or (len(buttons) > 3 and buttons[3]):
+                target_keys.add('x')
+                target_keys.add('c')
+            if len(buttons) > 8 and buttons[8]: # - (Minus)
+                target_keys.add(Key.esc)
+            if len(buttons) > 9 and buttons[9]: # + (Plus)
+                target_keys.add(Key.enter)
+                
+            # Apply key presses and releases
+            keys_to_press = target_keys - active_pressed_keys
+            keys_to_release = active_pressed_keys - target_keys
+            
+            for k in keys_to_release:
+                try: keyboard_controller.release(k)
+                except Exception: pass
+                
+            for k in keys_to_press:
+                try: keyboard_controller.press(k)
+                except Exception: pass
+                
+            active_pressed_keys.clear()
+            active_pressed_keys.update(target_keys)
+        except Exception as ex:
+            pass
+
+def get_local_ip():
+    """Find local network IP address."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
+
+def generate_synthetic_frame(dt):
+    """Generate a high-motion synthetic benchmark frame with timestamps and bouncing logo."""
+    state.frame_id += 1
+    w, h = state.width, state.height
+    
+    # Update bouncing ball physics
+    state.ball_x += state.ball_vx * dt
+    state.ball_y += state.ball_vy * dt
+    
+    r = state.ball_radius
+    if state.ball_x - r < 0:
+        state.ball_x = r
+        state.ball_vx *= -1
+    elif state.ball_x + r > w:
+        state.ball_x = w - r
+        state.ball_vx *= -1
+        
+    if state.ball_y - r < 0:
+        state.ball_y = r
+        state.ball_vy *= -1
+    elif state.ball_y + r > h:
+        state.ball_y = h - r
+        state.ball_vy *= -1
+        
+    # Canvas background - dynamic hue shift
+    curr_time = time.time()
+    rel_time = curr_time - state.start_time
+    hue = int((rel_time * 40) % 180)
+    hsv_bg = np.full((h, w, 3), (hue, 120, 45), dtype=np.uint8)
+    frame = cv2.cvtColor(hsv_bg, cv2.COLOR_HSV2BGR)
+    
+    # Grid overlay
+    grid_size = 40 if w >= 854 else 20
+    for x in range(0, w, grid_size):
+        cv2.line(frame, (x, 0), (x, h), (60, 60, 60), 1)
+    for y in range(0, h, grid_size):
+        cv2.line(frame, (0, y), (w, y), (60, 60, 60), 1)
+        
+    # Draw animated color spectrum wheel/bar at bottom
+    bar_h = 24 if h >= 720 else 14
+    spectrum = np.linspace(0, 179, w, dtype=np.int32)
+    shift = int((rel_time * 60) % 180)
+    spectrum_img = np.zeros((bar_h, w, 3), dtype=np.uint8)
+    spectrum_img[:, :, 0] = ((spectrum + shift) % 180).astype(np.uint8)
+    spectrum_img[:, :, 1] = 255
+    spectrum_img[:, :, 2] = 255
+    spectrum_bgr = cv2.cvtColor(spectrum_img, cv2.COLOR_HSV2BGR)
+    frame[h - bar_h:h, 0:w] = spectrum_bgr
+
+    # Draw Bouncing Ball with glow & gradient
+    bx, by = int(state.ball_x), int(state.ball_y)
+    ball_color = (0, 255, 255) # Yellow/Cyan
+    cv2.circle(frame, (bx, by), r, ball_color, -1)
+    cv2.circle(frame, (bx, by), r, (255, 255, 255), 3)
+    cv2.putText(frame, "TEST 3", (bx - int(r*0.7), by + 5), cv2.FONT_HERSHEY_SIMPLEX, 
+                0.5 if w < 854 else 0.8, (0, 0, 0), 2)
+    
+    # Draw Header Information Block
+    now_ms = int((time.time() - state.start_time) * 1000)
+    time_str = time.strftime("%H:%M:%S", time.localtime()) + f".{int((time.time() % 1) * 1000):03d}"
+    
+    font_scale = 0.5 if w < 854 else 0.8
+    thickness = 2
+    
+    # Top overlay header box
+    cv2.rectangle(frame, (10, 10), (w - 10, 95 if h >= 720 else 65), (20, 20, 20), -1)
+    cv2.rectangle(frame, (10, 10), (w - 10, 95 if h >= 720 else 65), (0, 220, 255), 2)
+    
+    line1 = f"SWITCH LITE STREAM TEST 3 - {state.resolution} @ {state.fps}FPS (Q:{state.quality}%)"
+    line2 = f"FRAME: #{state.frame_id} | TIME: {time_str} | MODE: {state.mode.upper()}"
+    
+    cv2.putText(frame, line1, (20, 35 if h >= 720 else 30), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 255, 0), thickness)
+    cv2.putText(frame, line2, (20, 70 if h >= 720 else 55), cv2.FONT_HERSHEY_SIMPLEX, font_scale * 0.9, (255, 255, 255), 1)
+
+    # Gamepad status overlay on frame
+    gp = state.latest_gamepad
+    if gp and gp.get("connected"):
+        axes = gp.get("axes", [0, 0, 0, 0])
+        lx, ly = axes[0] if len(axes) > 0 else 0, axes[1] if len(axes) > 1 else 0
+        rx, ry = axes[2] if len(axes) > 2 else 0, axes[3] if len(axes) > 3 else 0
+        
+        # Stick visualizers
+        center_lx = w - 140
+        center_ly = h - 100
+        cv2.circle(frame, (center_lx, center_ly), 30, (80, 80, 80), 2)
+        cv2.circle(frame, (int(center_lx + lx * 25), int(center_ly + ly * 25)), 8, (0, 255, 0), -1)
+        
+        center_rx = w - 60
+        center_ry = h - 100
+        cv2.circle(frame, (center_rx, center_ry), 30, (80, 80, 80), 2)
+        cv2.circle(frame, (int(center_rx + rx * 25), int(center_ry + ry * 25)), 8, (255, 0, 255), -1)
+        
+        cv2.putText(frame, "SWITCH GAMEPAD", (w - 180, h - 145), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+
+    # Encode frame to JPEG
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), state.quality]
+    _, jpeg_buf = cv2.imencode('.jpg', frame, encode_param)
+    return jpeg_buf.tobytes()
+
+# DXCAM ultra-fast GPU screen capture initialization
+try:
+    import dxcam
+    dx_camera = dxcam.create(output_color="BGR")
+    dx_camera.start(target_fps=60, video_mode=True)
+    print("[CAPTURE ENGINE] DXCAM DirectX Desktop Duplication GPU capture enabled (1000+ FPS capability)!")
+except Exception as e:
+    dx_camera = None
+    print(f"[CAPTURE ENGINE WARNING] DXCAM fallback to PIL/OpenCV: {e}")
+
+def capture_desktop_frame():
+    """Capture live Windows desktop and convert to JPEG."""
+    state.frame_id += 1
+    w, h = state.width, state.height
+    try:
+        frame = None
+        global dx_camera
+        if dx_camera:
+            try:
+                frame = dx_camera.get_latest_frame()
+            except Exception:
+                pass
+                
+        if frame is None:
+            img = ImageGrab.grab()
+            img_np = np.array(img)
+            # Convert RGB to BGR
+            frame = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            
+        frame_resized = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
+        
+        # Overlay frame counter & timestamp
+        time_str = time.strftime("%H:%M:%S", time.localtime()) + f".{int((time.time() % 1) * 1000):03d}"
+        overlay_txt = f"LIVE DESKTOP #{state.frame_id} | {time_str} | {state.resolution}@{state.fps}FPS Q:{state.quality}%"
+        cv2.putText(frame_resized, overlay_txt, (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), state.quality]
+        _, jpeg_buf = cv2.imencode('.jpg', frame_resized, encode_param)
+        return jpeg_buf.tobytes()
+    except Exception as e:
+        print(f"Desktop capture error: {e}")
+        return generate_synthetic_frame(0.033)
+
+def get_next_frame(dt):
+    """Fetch next frame according to current mode."""
+    if state.mode == "desktop":
+        return capture_desktop_frame()
+    else:
+        return generate_synthetic_frame(dt)
+
+# Starlette Routes & Endpoints
+async def homepage(request):
+    """Serve main HTML app."""
+    return FileResponse("index.html")
+
+async def get_mjpeg_stream(request):
+    """HTTP MJPEG endpoint for Test 4 streaming evaluation."""
+    async def mjpeg_generator():
+        last_time = time.time()
+        while True:
+            now = time.time()
+            dt = now - last_time
+            last_time = now
+            
+            target_dt = 1.0 / max(1, state.fps)
+            frame_bytes = get_next_frame(dt)
+            
+            header = (
+                f"--frame\r\n"
+                f"Content-Type: image/jpeg\r\n"
+                f"Content-Length: {len(frame_bytes)}\r\n\r\n"
+            ).encode("utf-8")
+            yield header + frame_bytes + b"\r\n"
+            
+            elapsed = time.time() - now
+            sleep_time = max(0.001, target_dt - elapsed)
+            await asyncio.sleep(sleep_time)
+
+    return StreamingResponse(
+        mjpeg_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame"
+    )
+
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint streaming binary JPEG frames + JSON telemetry."""
+    await websocket.accept()
+    print("Client connected via WebSocket!")
+    
+    last_time = time.time()
+    
+    async def receive_messages():
+        """Listen for control commands and gamepad input from client."""
+        try:
+            while True:
+                msg_text = await websocket.receive_text()
+                try:
+                    data = json.loads(msg_text)
+                    msg_type = data.get("type")
+                    
+                    if msg_type == "config":
+                        if "resolution" in data:
+                            state.update_resolution(data["resolution"])
+                        if "fps" in data:
+                            state.fps = int(data["fps"])
+                        if "quality" in data:
+                            state.quality = int(data["quality"])
+                        if "mode" in data:
+                            state.mode = str(data["mode"])
+                        if "renderMethod" in data:
+                            state.render_method = str(data["renderMethod"])
+                        print(f"Updated config: {state.resolution} @ {state.fps}FPS, Q:{state.quality}%, Mode:{state.mode}")
+                        
+                        # Send ack
+                        await websocket.send_text(json.dumps({
+                            "type": "config_ack",
+                            "resolution": state.resolution,
+                            "fps": state.fps,
+                            "quality": state.quality,
+                            "mode": state.mode,
+                            "renderMethod": state.render_method
+                        }))
+
+                    elif msg_type == "ping":
+                        client_ts = data.get("timestamp", 0)
+                        await websocket.send_text(json.dumps({
+                            "type": "pong",
+                            "clientTimestamp": client_ts,
+                            "serverTimestamp": int(time.time() * 1000)
+                        }))
+
+                    elif msg_type == "gamepad":
+                        state.latest_gamepad = data
+                        update_virtual_controller(data)
+                        
+                except Exception as ex:
+                    print(f"Error parsing websocket message: {ex}")
+        except WebSocketDisconnect:
+            print("WebSocket client disconnected from receive loop.")
+        except Exception as e:
+            print(f"WebSocket receive exception: {e}")
+
+    # Task to handle incoming messages
+    rx_task = asyncio.create_task(receive_messages())
+    
+    try:
+        while True:
+            now = time.time()
+            dt = now - last_time
+            last_time = now
+            
+            target_dt = 1.0 / max(1, state.fps)
+            frame_bytes = get_next_frame(dt)
+            
+            # Pack binary frame header:
+            # Struct format: !III (3x 32-bit unsigned uints: frame_id, timestamp_ms, jpeg_len)
+            ts_ms = int((now - state.start_time) * 1000) & 0xFFFFFFFF
+            header = struct.pack("!III", state.frame_id, ts_ms, len(frame_bytes))
+            payload = header + frame_bytes
+            
+            await websocket.send_bytes(payload)
+            state.sent_frames += 1
+            state.bytes_sent += len(payload)
+            
+            elapsed = time.time() - now
+            sleep_time = max(0.001, target_dt - elapsed)
+            await asyncio.sleep(sleep_time)
+
+    except WebSocketDisconnect:
+        print("WebSocket disconnected.")
+    except Exception as e:
+        print(f"WebSocket send loop ended: {e}")
+    finally:
+        rx_task.cancel()
+
+routes = [
+    Route('/', homepage),
+    Route('/mjpeg', get_mjpeg_stream),
+    WebSocketRoute('/ws', websocket_endpoint),
+    Mount('/static', app=StaticFiles(directory='.'), name='static')
+]
+
+app = Starlette(debug=True, routes=routes)
+
+if __name__ == "__main__":
+    local_ip = get_local_ip()
+    port = 8080
+    print("=" * 70)
+    print("  STOCK NINTENDO SWITCH LITE PC STREAMING SERVER - TEST 3")
+    print("=" * 70)
+    print(f" Local Computer Address : http://localhost:{port}")
+    print(f" Nintendo Switch Lite URL: http://{local_ip}:{port}")
+    print(f" MJPEG Endpoint Stream  : http://{local_ip}:{port}/mjpeg")
+    print("=" * 70)
+    print(" Connect your Switch Lite using SwitchBru DNS (45.55.142.122)")
+    print(" Enter the URL above in the browser to start benchmarking!")
+    print("=" * 70)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

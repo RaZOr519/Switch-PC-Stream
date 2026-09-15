@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Switch Lite Game Streaming - Test 3 Benchmark</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Stream viewport */
+        #viewport-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+
+        #stream-canvas,
+        #stream-mjpeg {
+            width: 100%;
+            height: 100%;
+            max-width: 100vw;
+            max-height: 100vh;
+            object-fit: contain;
+        }
+
+        #stream-mjpeg {
+            display: none;
+        }
+
+        /* On-Screen HUD Overlay */
+        #hud-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            font-size: 13px;
+            z-index: 100;
+            min-width: 260px;
+            pointer-events: none;
+        }
+
+        .hud-title {
+            font-weight: 700;
+            font-size: 14px;
+            color: #38bdf8;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+
+        .hud-label {
+            color: #94a3b8;
+        }
+
+        .hud-val {
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        .val-good {
+            color: #4ade80;
+        }
+
+        .val-ok {
+            color: #facc15;
+        }
+
+        .val-warn {
+            color: #f87171;
+        }
+
+        /* Control Panel Header */
+        #control-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 8px 12px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 101;
+            max-width: 95vw;
+            overflow-x: auto;
+        }
+
+        .btn-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px;
+            border-radius: 6px;
+        }
+
+        .btn-group-title {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-right: 4px;
+            padding-left: 4px;
+        }
+
+        button {
+            background: #1e293b;
+            color: #cbd5e1;
+            border: 1px solid #334155;
+            padding: 6px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        button:hover,
+        button:focus {
+            background: #334155;
+            color: #fff;
+        }
+
+        button.active {
+            background: #0284c7;
+            border-color: #38bdf8;
+            color: #fff;
+        }
+
+        /* Gamepad visualizer badge */
+        #gp-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gp-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ef4444;
+        }
+
+        .gp-dot.connected {
+            background: #22c55e;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-container">
+        <div id="viewport-container">
+            <canvas id="stream-canvas" width="1280" height="720"></canvas>
+            <img id="stream-mjpeg" alt="MJPEG Stream">
+
+            <!-- Performance HUD -->
+            <div id="hud-overlay">
+                <div class="hud-title">
+                    <span>SWITCH STREAM HUD</span>
+                    <span id="hud-status" class="val-warn">DISCONNECTED</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">FPS Received / Rendered:</span>
+                    <span id="hud-fps" class="hud-val val-good">0 / 0</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">Render Time (per frame):</span>
+                    <span id="hud-rendertime" class="hud-val">0 ms</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">Network Latency (RTT):</span>
+                    <span id="hud-latency" class="hud-val">0 ms</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">Bandwidth / Frame Size:</span>
+                    <span id="hud-bitrate" class="hud-val">0 Mbps (0 KB)</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">Frame Drops:</span>
+                    <span id="hud-drops" class="hud-val">0 (0%)</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">Render Engine:</span>
+                    <span id="hud-engine" class="hud-val">createImageBitmap</span>
+                </div>
+                <div class="hud-row">
+                    <span class="hud-label">WebRTC / WebCodecs:</span>
+                    <span id="hud-capabilities" class="hud-val val-warn">Unsupported</span>
+                </div>
+            </div>
+
+            <!-- Gamepad Badge -->
+            <div id="gp-badge">
+                <div id="gp-dot" class="gp-dot"></div>
+                <span id="gp-text">Gamepad: Disconnected</span>
+            </div>
+
+            <!-- Interactive Benchmark Controls -->
+            <div id="control-panel">
+                <!-- Lock & HUD Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">VIEW</span>
+                    <button onclick="toggleGameLock()" id="btn-gamelock" class="active">🔒 LOCK UI</button>
+                    <button onclick="toggleMinimalHUD()" id="btn-minimalhud">👁️ MINIMAL HUD</button>
+                </div>
+
+                <!-- Resolution Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">RES</span>
+                    <button onclick="setResolution('360p')" id="btn-res-360p" tabindex="-1">360p</button>
+                    <button onclick="setResolution('480p')" id="btn-res-480p" tabindex="-1">480p</button>
+                    <button onclick="setResolution('720p')" id="btn-res-720p" class="active" tabindex="-1">720p</button>
+                </div>
+
+                <!-- FPS Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">FPS</span>
+                    <button onclick="setFPS(15)" id="btn-fps-15" tabindex="-1">15</button>
+                    <button onclick="setFPS(30)" id="btn-fps-30" tabindex="-1">30</button>
+                    <button onclick="setFPS(60)" id="btn-fps-60" class="active" tabindex="-1">60</button>
+                </div>
+
+                <!-- Quality Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">QUAL</span>
+                    <button onclick="setQuality(30)" id="btn-q-30" tabindex="-1">30%</button>
+                    <button onclick="setQuality(50)" id="btn-q-50" class="active" tabindex="-1">50%</button>
+                    <button onclick="setQuality(75)" id="btn-q-75" tabindex="-1">75%</button>
+                </div>
+
+                <!-- Protocol Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">PROTO</span>
+                    <button onclick="setProtocol('ws')" id="btn-proto-ws" class="active"
+                        tabindex="-1">WebSocket</button>
+                    <button onclick="setProtocol('mjpeg')" id="btn-proto-mjpeg" tabindex="-1">MJPEG</button>
+                </div>
+
+                <!-- Render Method Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">ENGINE</span>
+                    <button onclick="setRenderEngine('createImageBitmap')" id="btn-eng-bitmap"
+                        tabindex="-1">Bitmap</button>
+                    <button onclick="setRenderEngine('image')" id="btn-eng-img" class="active"
+                        tabindex="-1">Image</button>
+                </div>
+
+                <!-- Mode Group -->
+                <div class="btn-group">
+                    <span class="btn-group-title">SOURCE</span>
+                    <button onclick="setMode('synthetic')" id="btn-mode-synth" tabindex="-1">Synthetic</button>
+                    <button onclick="setMode('desktop')" id="btn-mode-desk" class="active"
+                        tabindex="-1">Desktop</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State Variables
+        let ws = null;
+        let isGameLocked = true; // Default locked so gamepad buttons don't interact with UI
+        let config = {
+            resolution: '720p',
+            fps: 60,
+            quality: 50,
+            protocol: 'ws',
+            mode: 'desktop',
+            renderEngine: 'image'
+        };
+
+        // Performance Metrics
+        let framesReceived = 0;
+        let framesRendered = 0;
+        let totalBytesReceived = 0;
+        let renderTimeSum = 0;
+        let frameDropCount = 0;
+        let lastFrameId = -1;
+        let latencyMs = 0;
+        let lastPingTime = 0;
+
+        // DOM Elements
+        const canvas = document.getElementById('stream-canvas');
+        const ctx = canvas.getContext('2d');
+        const mjpegImg = document.getElementById('stream-mjpeg');
+        const hudStatus = document.getElementById('hud-status');
+        const hudFps = document.getElementById('hud-fps');
+        const hudRenderTime = document.getElementById('hud-rendertime');
+        const hudLatency = document.getElementById('hud-latency');
+        const hudBitrate = document.getElementById('hud-bitrate');
+        const hudDrops = document.getElementById('hud-drops');
+        const hudEngine = document.getElementById('hud-engine');
+        const hudCap = document.getElementById('hud-capabilities');
+        const gpDot = document.getElementById('gp-dot');
+        const gpText = document.getElementById('gp-text');
+
+        // Capabilities Check
+        const hasWebRTC = typeof RTCPeerConnection !== 'undefined';
+        const hasWebCodecs = typeof VideoDecoder !== 'undefined';
+        const hasCreateImageBitmap = typeof createImageBitmap === 'function';
+
+        hudCap.textContent = `WebRTC:${hasWebRTC ? '✅' : '❌'} Codecs:${hasWebCodecs ? '✅' : '❌'} Bitmap:${hasCreateImageBitmap ? '✅' : '❌'}`;
+        if (!hasCreateImageBitmap) {
+            config.renderEngine = 'image';
+            document.getElementById('btn-eng-bitmap').disabled = true;
+            document.getElementById('btn-eng-img').classList.add('active');
+        }
+
+        // Connect WebSocket
+        function connectWebSocket() {
+            const host = location.host;
+            const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + host + '/ws';
+
+            console.log('Connecting to WebSocket:', wsUrl);
+            ws = new WebSocket(wsUrl);
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                console.log('WebSocket connected!');
+                hudStatus.textContent = 'CONNECTED';
+                hudStatus.className = 'val-good';
+                sendConfig();
+                startPingLoop();
+            };
+
+            ws.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    // JSON control or ping response
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'pong') {
+                            latencyMs = Math.round(performance.now() - lastPingTime);
+                            hudLatency.textContent = `${latencyMs} ms`;
+                        }
+                    } catch (e) { }
+                } else if (event.data instanceof ArrayBuffer) {
+                    // Binary JPEG frame
+                    handleBinaryFrame(event.data);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket closed. Reconnecting in 2s...');
+                hudStatus.textContent = 'RECONNECTING...';
+                hudStatus.className = 'val-warn';
+                setTimeout(connectWebSocket, 2000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+            };
+        }
+
+        // Handle incoming Binary Frame
+        function handleBinaryFrame(buffer) {
+            const startTime = performance.now();
+            framesReceived++;
+            totalBytesReceived += buffer.byteLength;
+
+            // Parse 12-byte header: uint32 frame_id, uint32 timestamp_ms, uint32 jpeg_len
+            const view = new DataView(buffer);
+            const frameId = view.getUint32(0, false); // Big endian
+            const jpegBytes = buffer.slice(12);
+
+            if (lastFrameId !== -1 && frameId > lastFrameId + 1) {
+                frameDropCount += (frameId - lastFrameId - 1);
+            }
+            lastFrameId = frameId;
+
+            const blob = new Blob([jpegBytes], { type: 'image/jpeg' });
+
+            if (config.renderEngine === 'createImageBitmap' && hasCreateImageBitmap) {
+                createImageBitmap(blob)
+                    .then((bitmap) => {
+                        if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+                            canvas.width = bitmap.width;
+                            canvas.height = bitmap.height;
+                        }
+                        ctx.drawImage(bitmap, 0, 0);
+                        bitmap.close();
+                        framesRendered++;
+                        renderTimeSum += (performance.now() - startTime);
+                    })
+                    .catch((err) => {
+                        console.warn('createImageBitmap failed, falling back to Image:', err);
+                        renderWithImageObject(blob, startTime);
+                    });
+            } else {
+                renderWithImageObject(blob, startTime);
+            }
+        }
+
+        function renderWithImageObject(blob, startTime) {
+            const img = new Image();
+            const url = URL.createObjectURL(blob);
+            img.onload = () => {
+                if (canvas.width !== img.width || canvas.height !== img.height) {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                }
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                framesRendered++;
+                renderTimeSum += (performance.now() - startTime);
+            };
+            img.onerror = () => { URL.revokeObjectURL(url); };
+            img.src = url;
+        }
+
+        function sendConfig() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'config',
+                    resolution: config.resolution,
+                    fps: config.fps,
+                    quality: config.quality,
+                    mode: config.mode,
+                    renderMethod: config.renderEngine
+                }));
+            }
+        }
+
+        function startPingLoop() {
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    lastPingTime = performance.now();
+                    ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+                }
+            }, 1000);
+        }
+
+        // Telemetry Statistics Timer (Every 1 Second)
+        setInterval(() => {
+            const rxFps = framesReceived;
+            const rendFps = framesRendered;
+            const avgRenderMs = rendFps > 0 ? (renderTimeSum / rendFps).toFixed(1) : '0';
+            const bitrateMbps = ((totalBytesReceived * 8) / 1000000).toFixed(2);
+            const avgFrameKb = rxFps > 0 ? (totalBytesReceived / rxFps / 1024).toFixed(1) : '0';
+            const dropPct = rxFps > 0 ? ((frameDropCount / (rxFps + frameDropCount)) * 100).toFixed(1) : '0';
+
+            hudFps.textContent = `${rxFps} / ${rendFps}`;
+            hudRenderTime.textContent = `${avgRenderMs} ms`;
+            hudBitrate.textContent = `${bitrateMbps} Mbps (${avgFrameKb} KB/frame)`;
+            hudDrops.textContent = `${frameDropCount} (${dropPct}%)`;
+            hudEngine.textContent = config.protocol === 'mjpeg' ? 'MJPEG <img>' : config.renderEngine;
+
+            if (isMinimalHUD) {
+                const badge = document.getElementById('minimal-fps-badge');
+                if (badge) badge.textContent = `${rendFps} FPS`;
+            }
+
+            // Color coding
+            if (rxFps >= config.fps * 0.9) hudFps.className = 'hud-val val-good';
+            else if (rxFps >= config.fps * 0.6) hudFps.className = 'hud-val val-ok';
+            else hudFps.className = 'hud-val val-warn';
+
+            framesReceived = 0;
+            framesRendered = 0;
+            totalBytesReceived = 0;
+            renderTimeSum = 0;
+        }, 1000);
+
+        // Gamepad API Polling Loop
+        function pollGamepad() {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            let activeGp = null;
+            for (let i = 0; i < gamepads.length; i++) {
+                if (gamepads[i] && gamepads[i].connected) {
+                    activeGp = gamepads[i];
+                    break;
+                }
+            }
+
+            if (activeGp) {
+                gpDot.classList.add('connected');
+                gpText.textContent = `Gamepad: ${activeGp.id.substring(0, 18)}`;
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    const gpData = {
+                        type: 'gamepad',
+                        connected: true,
+                        axes: Array.from(activeGp.axes),
+                        buttons: activeGp.buttons.map(b => b.pressed ? 1 : 0),
+                        timestamp: Date.now()
+                    };
+                    ws.send(JSON.stringify(gpData));
+                }
+            } else {
+                gpDot.classList.remove('connected');
+                gpText.textContent = 'Gamepad: Disconnected';
+            }
+
+            requestAnimationFrame(pollGamepad);
+        }
+        requestAnimationFrame(pollGamepad);
+
+        let isMinimalHUD = false;
+        let prevUrl = null;
+
+        function toggleMinimalHUD() {
+            isMinimalHUD = !isMinimalHUD;
+            const btn = document.getElementById('btn-minimalhud');
+            const header = document.querySelector('header');
+            const controlPanel = document.getElementById('control-panel');
+            const metricsBar = document.getElementById('metrics-bar');
+
+            if (isMinimalHUD) {
+                if (btn) btn.textContent = '📊 FULL HUD';
+                if (header) header.style.display = 'none';
+                if (controlPanel) controlPanel.style.display = 'none';
+                if (metricsBar) metricsBar.style.display = 'none';
+                createMinimalFPSOverlay();
+            } else {
+                if (btn) btn.textContent = '👁️ MINIMAL HUD';
+                if (header) header.style.display = 'flex';
+                if (controlPanel) controlPanel.style.display = 'flex';
+                if (metricsBar) metricsBar.style.display = 'flex';
+                removeMinimalFPSOverlay();
+            }
+        }
+
+        function createMinimalFPSOverlay() {
+            let overlay = document.getElementById('minimal-fps-badge');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'minimal-fps-badge';
+                overlay.style.cssText = 'position:fixed; top:10px; right:12px; background:rgba(0,0,0,0.65); color:#00f0ff; padding:5px 12px; border-radius:14px; font-weight:bold; font-size:15px; font-family:monospace; border:1px solid rgba(0,240,255,0.4); z-index:9999; cursor:pointer; user-select:none; backdrop-filter:blur(4px);';
+                overlay.onclick = toggleMinimalHUD;
+                document.body.appendChild(overlay);
+            }
+            overlay.style.display = 'block';
+            overlay.textContent = metrics.fps + ' FPS';
+        }
+
+        function removeMinimalFPSOverlay() {
+            const overlay = document.getElementById('minimal-fps-badge');
+            if (overlay) overlay.style.display = 'none';
+        }
+
+        function toggleGameLock() {
+            isGameLocked = !isGameLocked;
+            const btn = document.getElementById('btn-gamelock');
+            if (isGameLocked) {
+                btn.textContent = '🔒 LOCK UI';
+                btn.classList.add('active');
+                if (document.activeElement) document.activeElement.blur();
+            } else {
+                btn.textContent = '🔓 UNLOCKED';
+                btn.classList.remove('active');
+            }
+        }
+
+        // Blur spatial navigation focus automatically in Lock Mode
+        setInterval(() => {
+            if (isGameLocked && document.activeElement && document.activeElement.tagName !== 'BODY') {
+                document.activeElement.blur();
+            }
+        }, 100);
+
+        // Prevent spatial navigation & key events from triggering browser button clicks
+        window.addEventListener('keydown', (e) => {
+            if (isGameLocked && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+
+        // Control Handlers
+        function setResolution(res) {
+            config.resolution = res;
+            updateActiveButtons('res', res);
+            sendConfig();
+            if (config.protocol === 'mjpeg') restartMJPEG();
+            if (isGameLocked && document.activeElement) document.activeElement.blur();
+        }
+
+        function setFPS(fps) {
+            config.fps = fps;
+            updateActiveButtons('fps', fps);
+            sendConfig();
+            if (config.protocol === 'mjpeg') restartMJPEG();
+        }
+
+        function setQuality(q) {
+            config.quality = q;
+            updateActiveButtons('q', q);
+            sendConfig();
+            if (config.protocol === 'mjpeg') restartMJPEG();
+        }
+
+        function setMode(mode) {
+            config.mode = mode;
+            updateActiveButtons('mode', mode === 'synthetic' ? 'synth' : 'desk');
+            sendConfig();
+            if (config.protocol === 'mjpeg') restartMJPEG();
+        }
+
+        function setRenderEngine(eng) {
+            config.renderEngine = eng;
+            updateActiveButtons('eng', eng === 'createImageBitmap' ? 'bitmap' : 'img');
+            sendConfig();
+        }
+
+        function setProtocol(proto) {
+            config.protocol = proto;
+            updateActiveButtons('proto', proto);
+            if (proto === 'mjpeg') {
+                canvas.style.display = 'none';
+                mjpegImg.style.display = 'block';
+                restartMJPEG();
+            } else {
+                mjpegImg.style.display = 'none';
+                mjpegImg.src = '';
+                canvas.style.display = 'block';
+                sendConfig();
+            }
+        }
+
+        function restartMJPEG() {
+            mjpegImg.src = `/mjpeg?res=${config.resolution}&fps=${config.fps}&q=${config.quality}&mode=${config.mode}&t=${Date.now()}`;
+        }
+
+        function updateActiveButtons(prefix, val) {
+            document.querySelectorAll(`[id^="btn-${prefix}-"]`).forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-${prefix}-${val}`);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        // Initialize
+        connectWebSocket();
+    </script>
+</body>
+
+</html>
