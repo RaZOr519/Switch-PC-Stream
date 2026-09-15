@@ -10,6 +10,18 @@
 
 ---
 
+## 🎥 Real-World Video Demonstrations
+
+Check out live video test runs of the Nintendo Switch Lite streaming at 720p @ 60 FPS over local network:
+
+https://github.com/user-attachments/assets/demo1.mp4
+
+https://github.com/user-attachments/assets/demo2.mp4
+
+> *Note: Videos are hosted in the [`media/`](media/) folder (`media/demo1.mp4` and `media/demo2.mp4`).*
+
+---
+
 ## 🌟 Overview
 
 **SwitchLite-PC-Stream** is a high-performance open-source game streaming solution for the Nintendo Switch Lite **without modchips, jailbreaks, Android/Linux installations, or custom firmware**.
