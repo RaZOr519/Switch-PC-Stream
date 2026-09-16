@@ -525,7 +525,8 @@
 
             if (activeGp) {
                 gpDot.classList.add('connected');
-                gpText.textContent = `Gamepad: ${activeGp.id.substring(0, 18)}`;
+                const axisStr = Array.from(activeGp.axes).map(a => a.toFixed(2)).join(',');
+                gpText.textContent = `Gamepad: ${activeGp.id.substring(0, 10)} | Axes: [${axisStr}]`;
 
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     const gpData = {
