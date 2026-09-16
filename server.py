@@ -77,9 +77,18 @@ try:
     print("[KEYBOARD BRIDGE] Windows Keyboard Injection initialized successfully!")
 except Exception as e:
     keyboard_controller = None
-    print(f"[KEYBOARD BRIDGE WARNING] Could not initialize pynput: {e}")
+    print(f"[KEYBOARD BRIDGE WARNING] Could not initialize pynput keyboard: {e}")
+
+try:
+    from pynput.mouse import Controller as MouseController, Button as MouseButton
+    mouse_controller = MouseController()
+    print("[MOUSE BRIDGE] Windows Mouse Injection initialized successfully!")
+except Exception as e:
+    mouse_controller = None
+    print(f"[MOUSE BRIDGE WARNING] Could not initialize pynput mouse: {e}")
 
 active_pressed_keys = set()
+active_pressed_mouse_buttons = set()
 
 KEYMAP_FILE = os.path.join(os.path.dirname(__file__), "keymap.json")
 
@@ -121,12 +130,13 @@ def resolve_pynput_key(key_str):
     special = {
         "left": Key.left, "right": Key.right, "up": Key.up, "down": Key.down,
         "space": Key.space, "esc": Key.esc, "enter": Key.enter,
-        "shift": Key.shift, "ctrl": Key.ctrl, "alt": Key.alt, "tab": Key.tab
+        "shift": Key.shift, "ctrl": Key.ctrl, "alt": Key.alt, "tab": Key.tab,
+        "caps_lock": Key.caps_lock, "backspace": Key.backspace
     }
     return special.get(k, k)
 
 def update_virtual_controller(gp_data):
-    """Translate Switch Lite Gamepad API data to Virtual Xbox 360 Controller AND Windows Keyboard Events via keymap.json."""
+    """Translate Switch Lite Gamepad API data to Virtual Xbox 360 Controller AND Windows Keyboard/Mouse Events via keymap.json."""
     axes = gp_data.get("axes", [0, 0, 0, 0])
     buttons = gp_data.get("buttons", [])
     
@@ -176,15 +186,16 @@ def update_virtual_controller(gp_data):
         except Exception as ex:
             pass
 
-    # --- 2. WINDOWS KEYBOARD INJECTION (pynput) ---
-    if keyboard_controller:
+    # --- 2. WINDOWS KEYBOARD & MOUSE INJECTION (pynput) ---
+    if keyboard_controller or mouse_controller:
         try:
             target_keys = set()
+            target_mouse = set()
             
             lx = float(axes[0]) if len(axes) > 0 else 0.0
             ly = float(axes[1]) if len(axes) > 1 else 0.0
             
-            # Left Stick & D-Pad Keyboard Mapping
+            # Left Stick Keyboard Mapping (WASD)
             if lx < -0.3:
                 for k in kb_config.get("left_stick_left", []): target_keys.add(resolve_pynput_key(k))
             if lx > 0.3:
@@ -193,28 +204,69 @@ def update_virtual_controller(gp_data):
                 for k in kb_config.get("left_stick_up", []): target_keys.add(resolve_pynput_key(k))
             if ly > 0.3:
                 for k in kb_config.get("left_stick_down", []): target_keys.add(resolve_pynput_key(k))
+
+            # Right Stick Mouse Camera Movement
+            rx = float(axes[2]) if len(axes) > 2 else 0.0
+            ry = float(axes[3]) if len(axes) > 3 else 0.0
+            if mouse_controller and (abs(rx) > 0.15 or abs(ry) > 0.15):
+                dx = int(rx * 25)
+                dy = int(ry * 25)
+                mouse_controller.move(dx, dy)
                 
-            # Direct Button Keyboard Mapping
+            # Direct Button Keyboard & Mouse Mapping
             for sw_idx in range(len(buttons)):
                 if buttons[sw_idx]:
                     btn_keys = kb_config.get(f"button_{sw_idx}", [])
                     for k in btn_keys:
-                        target_keys.add(resolve_pynput_key(k))
+                        k_str = str(k).lower()
+                        if k_str in ["right_click", "right_mouse", "mouse_right"]:
+                            target_mouse.add("right")
+                        elif k_str in ["left_click", "left_mouse", "mouse_left"]:
+                            target_mouse.add("left")
+                        else:
+                            target_keys.add(resolve_pynput_key(k))
+                            
+            # Explicit ZL & ZR triggers if mapped or axis pressed
+            zl_pressed = (len(buttons) > 6 and buttons[6]) or (len(axes) > 4 and axes[4] > 0.5)
+            zr_pressed = (len(buttons) > 7 and buttons[7]) or (len(axes) > 5 and axes[5] > 0.5)
+            if zl_pressed: target_mouse.add("right")
+            if zr_pressed: target_mouse.add("left")
                         
-            # Apply key presses and releases
-            keys_to_press = target_keys - active_pressed_keys
-            keys_to_release = active_pressed_keys - target_keys
-            
-            for k in keys_to_release:
-                try: keyboard_controller.release(k)
-                except Exception: pass
+            # Apply Keyboard key presses and releases
+            if keyboard_controller:
+                keys_to_press = target_keys - active_pressed_keys
+                keys_to_release = active_pressed_keys - target_keys
                 
-            for k in keys_to_press:
-                try: keyboard_controller.press(k)
-                except Exception: pass
+                for k in keys_to_release:
+                    try: keyboard_controller.release(k)
+                    except Exception: pass
+                    
+                for k in keys_to_press:
+                    try: keyboard_controller.press(k)
+                    except Exception: pass
+                    
+                active_pressed_keys.clear()
+                active_pressed_keys.update(target_keys)
                 
-            active_pressed_keys.clear()
-            active_pressed_keys.update(target_keys)
+            # Apply Mouse button clicks and releases
+            if mouse_controller:
+                m_to_press = target_mouse - active_pressed_mouse_buttons
+                m_to_release = active_pressed_mouse_buttons - target_mouse
+                
+                for m in m_to_release:
+                    try:
+                        if m == "right": mouse_controller.release(MouseButton.right)
+                        elif m == "left": mouse_controller.release(MouseButton.left)
+                    except Exception: pass
+                    
+                for m in m_to_press:
+                    try:
+                        if m == "right": mouse_controller.press(MouseButton.right)
+                        elif m == "left": mouse_controller.press(MouseButton.left)
+                    except Exception: pass
+                    
+                active_pressed_mouse_buttons.clear()
+                active_pressed_mouse_buttons.update(target_mouse)
         except Exception as ex:
             pass
 

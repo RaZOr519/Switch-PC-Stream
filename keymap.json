@@ -1,5 +1,5 @@
 {
-    "_comment": "Switch Lite Gamepad to Xbox 360 & Keyboard Key Mapping Configuration",
+    "_comment": "GTA V & PC Game Optimized Keymap (Switch Lite Gamepad API -> Xbox 360 & Keyboard/Mouse)",
     "xbox_mapping": {
         "0": "A",
         "1": "B",
@@ -17,68 +17,68 @@
         "15": "DPAD_RIGHT"
     },
     "keyboard_mapping": {
+        "_comment_stick": "Left stick moves character (WASD) - NO arrow keys so walking forward will not pull out the phone!",
         "left_stick_left": [
-            "a",
-            "left"
-        ],
-        "left_stick_right": [
-            "d",
-            "right"
-        ],
-        "left_stick_up": [
-            "w",
-            "up"
-        ],
-        "left_stick_down": [
-            "s",
-            "down"
-        ],
-        "dpad_up": [
-            "up",
-            "w"
-        ],
-        "dpad_down": [
-            "down",
-            "s"
-        ],
-        "dpad_left": [
-            "left",
             "a"
         ],
-        "dpad_right": [
-            "right",
+        "left_stick_right": [
             "d"
         ],
+        "left_stick_up": [
+            "w"
+        ],
+        "left_stick_down": [
+            "s"
+        ],
+        "_comment_dpad": "D-Pad controls phone, character wheel, and radio in GTA V",
+        "button_12": [
+            "up"
+        ],
+        "button_13": [
+            "down"
+        ],
+        "button_14": [
+            "left"
+        ],
+        "button_15": [
+            "right"
+        ],
+        "_comment_buttons": "Action buttons mapped for GTA V PC controls",
         "button_0": [
-            "space",
-            "z"
-        ],
-        "button_1": [
-            "z"
-        ],
-        "button_2": [
-            "x"
-        ],
-        "button_3": [
-            "c"
-        ],
-        "button_4": [
             "shift"
         ],
+        "button_1": [
+            "r"
+        ],
+        "button_2": [
+            "space"
+        ],
+        "button_3": [
+            "f"
+        ],
+        "button_4": [
+            "tab"
+        ],
         "button_5": [
-            "ctrl"
+            "q"
         ],
         "button_6": [
-            "space"
+            "right_click"
         ],
         "button_7": [
-            "space"
+            "left_click"
         ],
         "button_8": [
-            "esc"
+            "v"
         ],
         "button_9": [
-            "enter"
+            "esc"
+        ],
+        "button_10": [
+            "caps_lock"
+        ],
+        "button_11": [
+            "c"
         ]
     }
 }
