@@ -192,9 +192,6 @@ def update_virtual_controller(gp_data):
                     
             if abs(rx) < 0.03: rx = 0.0
             if abs(ry) < 0.03: ry = 0.0
-            
-            if abs(rx) > 0.05 or abs(ry) > 0.05:
-                print(f"[RIGHT STICK DEBUG] rx={rx:.3f}, ry={ry:.3f} | Raw Axes: {[round(a, 2) for a in axes]}")
 
             virtual_gamepad.right_joystick(x_value=int(rx * 32767), y_value=int(-ry * 32767))
             

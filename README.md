@@ -1,62 +1,59 @@
 # 🎮 SwitchLite-PC-Stream
 
-> **Low-Latency PC Game Streaming on a Completely Stock, Unmodded Nintendo Switch Lite**
-> *Render 720p @ 60 FPS over local network using the Switch's hidden captive-portal WebKit browser!*
+> **Low-Latency PC Game Streaming Engine for Stock, Unmodded Nintendo Switch Lite**  
+> *Stream 720p @ 60 FPS over local network using the Switch's native WebKit browser!*
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
-![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)
+![Release](https://img.shields.io/badge/Release-v0.0.1-blue.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)
 ![Resolution](https://img.shields.io/badge/Resolution-1280x720%20%40%2060FPS-orange.svg)
 ![Platform](https://img.shields.io/badge/Platform-Nintendo%20Switch%20Lite%20%28Stock%2FUnmodded%29-red.svg)
 [![Ko-fi](https://img.shields.io/badge/Support%20Me-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/sachindewthuru)
 
 ---
 
-## 🎥 Real-World Video Demonstrations
+## 🎥 Demonstration Media
 
-Check out live video test runs of the Nintendo Switch Lite streaming at 720p @ 60 FPS over local network:
+Check out live video test runs of the Nintendo Switch Lite streaming PC games at 720p @ 60 FPS over local network:
 
-* 🎬 **[Watch Demo Video 1 (Gameplay Test)](https://github.com/RaZOr519/Switch-PC-Stream/blob/main/media/demo1.mp4)**
-* 🎬 **[Watch Demo Video 2 (Input & Latency Test)](https://github.com/RaZOr519/Switch-PC-Stream/blob/main/media/demo2.mp4)**
-
-<p align="center">
-  <video src="https://raw.githubusercontent.com/RaZOr519/Switch-PC-Stream/main/media/demo1.mp4" controls width="48%"></video>
-  <video src="https://raw.githubusercontent.com/RaZOr519/Switch-PC-Stream/main/media/demo2.mp4" controls width="48%"></video>
-</p>
+* 🎬 **[Watch Demo Video 1 (Gameplay Stream Test)](https://github.com/RaZOr519/Switch-PC-Stream/blob/main/media/demo1.mp4)**
+* 🎬 **[Watch Demo Video 2 (Input Latency & Controls Test)](https://github.com/RaZOr519/Switch-PC-Stream/blob/main/media/demo2.mp4)**
 
 ---
 
-## 🌟 Overview
+## ⚡ Overview
 
-**SwitchLite-PC-Stream** is a high-performance open-source game streaming solution for the Nintendo Switch Lite **without modchips, jailbreaks, Android/Linux installations, or custom firmware**.
+**SwitchLite-PC-Stream** is a high-performance, low-latency open-source game streaming system designed to play any PC game, emulator, or desktop title on a **completely stock Nintendo Switch Lite** without modchips, jailbreaks, Android/Linux installations, or custom firmware.
 
-By leveraging the Switch's hidden WebKit browser (accessible via SwitchBru DNS), this project establishes a binary WebSocket stream using optimized JPEG frame compression and DXCAM GPU capture. Switch physical inputs (Analog Sticks, D-Pad, Buttons) are transmitted back to the PC over WebSocket and injected directly into Windows as **Native Xbox 360 Controller (XInput)** and **Keyboard/Mouse** events.
-
----
-
-## 🚀 Key Features
-
-* **⚡ Ultra-Fast DXCAM GPU Capture**: Uses Windows DirectX 11 Desktop Duplication API (`dxcam`) for **0.53 ms capture latency (1,899 FPS capability)**.
-* **🎯 720p @ 60 FPS Real-Time Streaming**: Native 1280x720 resolution tailored for the Switch Lite display with minimal latency (~15ms local network RTT).
-* **🎮 Dual Input Injection Bridge**:
-  * **Virtual Xbox 360 Controller (`vgamepad`)**: Native XInput controller support recognized by Steam, PC games, and emulators.
-  * **Windows Keyboard Injection (`pynput`)**: Fallback WASD + Arrow Keys + Spacebar mapping for standard PC executable games.
-* **🔒 Game Lock Mode & Focus Blurring**: Prevents Switch D-Pad/Button presses from highlighting or interacting with HTML webpage elements.
-* **👁️ Minimal HUD View**: Toggle between detailed real-time telemetry metrics and a clean full-screen view with only a floating FPS badge (`60 FPS`).
-* **🕹️ Included Sample 60 FPS Game**: Comes with `game.py` (2D Space Defender PC arcade game) for immediate out-of-the-box demonstration.
+By utilizing the Switch's hidden captive-portal WebKit browser (accessible via SwitchBru DNS), the system establishes a low-overhead WebSocket stream using DirectX 11 GPU Desktop Duplication (`dxcam`) and optimized JPEG frame compression. Physical controls (Analog Sticks, D-Pad, Buttons, Triggers) are captured via the WebKit HTML5 Gamepad API and transmitted back to the host PC in real-time, injecting them as **Virtual Xbox 360 Controller (XInput)** and **Hardware Raw Mouse/Keyboard** events.
 
 ---
 
-## 🏗️ Architecture Pipeline
+## 🌟 Key Features
+
+* **⚡ Ultra-Fast GPU Capture**: DirectX 11 GPU Desktop Duplication API (`dxcam`) provides **0.53 ms capture latency (1,899 FPS capability)**.
+* **🎯 720p @ 60 FPS Local Network Streaming**: Native 1280x720 resolution scaled for the Switch Lite screen with ultra-low end-to-end latency (~15 ms RTT).
+* **🎮 Universal Dual Input Engine**:
+  * **Virtual Xbox 360 Controller (`vgamepad`)**: Full 16-bit XInput controller emulation recognized by Steam, AAA PC titles, and emulators.
+  * **Hardware Raw Mouse & Keyboard Injection (`ctypes` + `pynput`)**: Direct Win32 `mouse_event` delta movement for 3D camera look (FPS/TPS) and WASD key injection.
+* **🕹️ Modular Keymap System (`keymap.json`)**: Reassign Xbox XInput and Keyboard/Mouse bindings for any game via simple JSON configuration.
+* **🔒 WebKit Navigation Trap**: `history.pushState` and `popstate` intercept physical Switch button presses (like B) to prevent unwanted browser navigation.
+* **👁️ Minimal HUD Mode**: Toggle between real-time network telemetry metrics and a clean full-screen view with a floating FPS counter (`60 FPS`).
+* **🕹️ Out-of-the-Box Demo Game**: Includes `game.py` (a 2D PC arcade game) for immediate verification after setup.
+
+---
+
+## 🏗️ System Architecture
 
 ```text
   +-------------------------------------------------------------------+
-  |                           GAMING PC                               |
+  |                           HOST GAMING PC                          |
   |                                                                   |
   |  +--------------------+         +------------------------------+  |
-  |  |  PC Game / Desktop |         |  Virtual Xbox 360 Controller |  |
+  |  |   PC Game / App    |         |  Virtual Xbox 360 Controller |  |
   |  +---------+----------+         +--------------^---------------+  |
-  |            | (DXCAM GPU)                       | (vgamepad /    |
-  |            v                                   |  pynput)       |
+  |            | (DXCAM GPU Capture)               | (vgamepad /    |
+  |            v                                   |  raw mouse)    |
   |  +---------------------------------------------+---------------+  |
   |  |                 Starlette / Uvicorn Server                  |  |
   |  +---------------------+-----------------------^----------------+  |
@@ -77,12 +74,12 @@ By leveraging the Switch's hidden WebKit browser (accessible via SwitchBru DNS),
 
 ---
 
-## 📊 Benchmark Results
+## 📊 Benchmark Telemetry
 
-Benchmarked on **1280x720 (Native Switch Lite Resolution)** over local Wi-Fi:
+Tested on a local 5GHz Wi-Fi network at native **1280x720 (Switch Lite resolution)**:
 
-| Resolution | Quality | Server Encode Latency | Server FPS Ceiling | Bandwidth @ 60FPS |
-|:----------:|:-------:|:---------------------:|:------------------:|:-----------------:|
+| Resolution | Quality | Host Encode Latency | Frame Capture Rate | Bandwidth @ 60FPS |
+|:----------:|:-------:|:------------------:|:------------------:|:-----------------:|
 | **360p** | 50% | 0.45 ms | 2,211 FPS | 5.08 Mbps |
 | **480p** | 50% | 0.86 ms | 1,163 FPS | 7.37 Mbps |
 | **720p** | **50% (Recommended)** | **1.62 ms** | **618 FPS** | **12.87 Mbps** |
@@ -90,49 +87,42 @@ Benchmarked on **1280x720 (Native Switch Lite Resolution)** over local Wi-Fi:
 
 ---
 
-## 🛠️ Step-by-Step Setup Guide
+## 🛠️ Installation & Setup
 
-### 1. Requirements on Gaming PC
-* **Windows 10 / 11**
+### 1. Host PC Requirements
+* **Windows 10 / 11 (64-bit)**
 * **Python 3.10+**
 * **ViGEmBus Driver (Required for Virtual Xbox 360 Controller)**:
-  * Installing `vgamepad` uses [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases). If you haven't installed ViGEmBus driver on your PC yet, download and install the installer from the official release page: [Download ViGEmBus_Setup.exe](https://github.com/nefarius/ViGEmBus/releases/latest).
+  * Install the ViGEmBus driver on your PC from the official release page: [Download ViGEmBus_Setup.exe](https://github.com/nefarius/ViGEmBus/releases/latest).
 
-Install required Python dependencies:
+Install Python dependencies:
 ```bash
 pip install starlette uvicorn opencv-python pillow numpy websockets dxcam vgamepad pynput pygame
 ```
 
-### 2. Start the PC Server & Controller Bridge
-In PowerShell or Command Prompt:
+### 2. Launch Server
+Run the streaming server in PowerShell or Command Prompt:
 ```bash
 python server.py
 ```
-*The terminal will output your PC's local network IP address (e.g. `http://192.168.1.6:8080`).*
+*The server will display your PC's local IP address (e.g. `http://192.168.1.6:8080`).*
 
-### 3. Launch the Included Sample Game (Optional)
-In a second terminal:
-```bash
-python game.py
-```
-*(Or open any Steam game, Xbox Game Pass title, or emulator on your PC desktop!)*
-
-### 4. Connect Your Stock Nintendo Switch Lite
+### 3. Connect Nintendo Switch Lite
 1. Go to **System Settings** → **Internet** → **Internet Settings** on your Switch Lite.
 2. Select your Wi-Fi network → **Change Settings**.
 3. Set **DNS Settings** to **Manual**.
 4. Set **Primary DNS** to `45.55.142.122` (SwitchBru DNS).
 5. Save and select **Connect to This Network**.
 6. When prompted, tap **Next** to open the captive portal web browser.
-7. Enter your PC's URL (e.g., `http://192.168.1.6:8080`).
+7. Enter your PC's URL (e.g. `http://192.168.1.6:8080`).
 8. Select **DESKTOP** (Source), **Image** (Engine), and **720p 60FPS**.
-9. Click **`👁️ MINIMAL HUD`** for full-screen game streaming!
+9. Click **`🔒 LOCK UI`** and **`👁️ MINIMAL HUD`** to begin streaming!
 
 ---
 
-## 🕹️ Input Mapping & Customization (`keymap.json`)
+## 🕹️ Input Configuration (`keymap.json`)
 
-All button and axis mappings are modularly configured in **`keymap.json`**. You can edit `keymap.json` at any time to reassign controls for specific PC games, emulators, or layout preferences:
+All controller buttons and axis behaviors are customizable in **`keymap.json`**:
 
 ```json
 {
@@ -151,39 +141,37 @@ All button and axis mappings are modularly configured in **`keymap.json`**. You 
     "15": "DPAD_RIGHT"
   },
   "keyboard_mapping": {
-    "left_stick_left": ["a", "left"],
-    "left_stick_right": ["d", "right"],
-    "left_stick_up": ["w", "up"],
-    "left_stick_down": ["s", "down"],
-    "button_0": ["space", "z"],
-    "button_1": ["z"],
-    "button_2": ["x"],
-    "button_3": ["c"],
-    "button_8": ["esc"],
-    "button_9": ["enter"]
+    "left_stick_left": ["a"],
+    "left_stick_right": ["d"],
+    "left_stick_up": ["w"],
+    "left_stick_down": ["s"],
+    "button_0": ["shift"],
+    "button_1": ["r"],
+    "button_2": ["space"],
+    "button_3": ["f"],
+    "button_4": ["tab"],
+    "button_5": ["q"]
   }
 }
 ```
-
-> **Note on Browser Back Navigation**: `index.html` includes a WebKit `popstate` history trap so that pressing physical Switch buttons (like B) inside Game Lock Mode will **not** trigger WebKit browser back navigation!
 
 ---
 
 ## 📜 Disclaimer & Legal Notice
 
-This project is an independent open-source research demonstration of low-latency local network streaming using standard web technologies.
+This repository is an open-source technical demonstration of low-latency local streaming using standard web protocols.
 
 * **Nintendo Switch** and **Nintendo Switch Lite** are registered trademarks of Nintendo Co., Ltd.
-* This project is not affiliated with, endorsed by, or sponsored by Nintendo Co., Ltd.
-* All code in this repository is 100% original and uses public APIs.
+* This project is independent and is not affiliated with, endorsed by, or sponsored by Nintendo Co., Ltd.
+* All code in this repository is original and relies exclusively on public web and operating system APIs.
 
 ---
 
-## ❤️ Support & Donate
+## ❤️ Contributing & Donations
 
-If you enjoy this project or found it helpful, consider supporting further development on Ko-fi!
+Contributions and pull requests are welcome! If you find this project useful, feel free to support development on Ko-fi:
 
-<a href="https://ko-fi.com/sachindewthuru" target="_blank"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me A Coffee on Ko-fi"></a>
+<a href="https://ko-fi.com/sachindewthuru" target="_blank"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support Me on Ko-fi"></a>
 
 ---
 

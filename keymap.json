@@ -1,5 +1,5 @@
 {
-    "_comment": "GTA V & PC Game Optimized Keymap (Switch Lite Gamepad API -> Xbox 360 & Keyboard/Mouse)",
+    "_comment": "Universal Custom Keymap Config (Nintendo Switch Gamepad API -> Xbox 360 XInput & Windows Keyboard/Mouse)",
     "xbox_mapping": {
         "0": "A",
         "1": "B",
@@ -17,7 +17,7 @@
         "15": "DPAD_RIGHT"
     },
     "keyboard_mapping": {
-        "_comment_stick": "Left stick moves character (WASD) - NO arrow keys so walking forward will not pull out the phone!",
+        "_comment_stick": "Left stick character / vehicle WASD movement",
         "left_stick_left": [
             "a"
         ],
@@ -30,7 +30,7 @@
         "left_stick_down": [
             "s"
         ],
-        "_comment_dpad": "D-Pad controls phone, character wheel, and radio in GTA V",
+        "_comment_dpad": "D-Pad Arrow key navigation",
         "button_12": [
             "up"
         ],
@@ -43,7 +43,7 @@
         "button_15": [
             "right"
         ],
-        "_comment_buttons": "Action buttons mapped for GTA V PC controls",
+        "_comment_buttons": "Universal Action buttons (Sprint, Jump, Interact, Triggers)",
         "button_0": [
             "shift"
         ],
