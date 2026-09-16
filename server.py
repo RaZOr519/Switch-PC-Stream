@@ -79,13 +79,33 @@ except Exception as e:
     keyboard_controller = None
     print(f"[KEYBOARD BRIDGE WARNING] Could not initialize pynput keyboard: {e}")
 
-try:
-    from pynput.mouse import Controller as MouseController, Button as MouseButton
-    mouse_controller = MouseController()
-    print("[MOUSE BRIDGE] Windows Mouse Injection initialized successfully!")
-except Exception as e:
-    mouse_controller = None
-    print(f"[MOUSE BRIDGE WARNING] Could not initialize pynput mouse: {e}")
+# Raw Windows mouse_event API for DirectX 11 3D Games (GTA V, FPS/TPS)
+import ctypes
+MOUSEEVENTF_MOVE = 0x0001
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_RIGHTDOWN = 0x0008
+MOUSEEVENTF_RIGHTUP = 0x0010
+
+def raw_mouse_move(dx, dy):
+    try:
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_MOVE, int(dx), int(dy), 0, 0)
+    except Exception:
+        pass
+
+def raw_mouse_click(button, press):
+    try:
+        if button == "left":
+            flags = MOUSEEVENTF_LEFTDOWN if press else MOUSEEVENTF_LEFTUP
+        elif button == "right":
+            flags = MOUSEEVENTF_RIGHTDOWN if press else MOUSEEVENTF_RIGHTUP
+        else:
+            return
+        ctypes.windll.user32.mouse_event(flags, 0, 0, 0, 0)
+    except Exception:
+        pass
+
+print("[MOUSE BRIDGE] Windows Raw mouse_event API initialized for DirectX 3D games!")
 
 active_pressed_keys = set()
 active_pressed_mouse_buttons = set()
@@ -201,8 +221,8 @@ def update_virtual_controller(gp_data):
         except Exception as ex:
             pass
 
-    # --- 2. WINDOWS KEYBOARD & MOUSE INJECTION (pynput) ---
-    if keyboard_controller or mouse_controller:
+    # --- 2. WINDOWS KEYBOARD & MOUSE INJECTION (pynput + ctypes mouse_event) ---
+    if keyboard_controller or True:
         try:
             target_keys = set()
             target_mouse = set()
@@ -220,7 +240,7 @@ def update_virtual_controller(gp_data):
             if ly > 0.2:
                 for k in kb_config.get("left_stick_down", []): target_keys.add(resolve_pynput_key(k))
 
-            # Right Stick Camera Movement (Mouse & Arrow Key Fallbacks)
+            # Right Stick Camera Movement (Native Windows raw mouse_event API for GTA V 3D Camera)
             rx = 0.0
             ry = 0.0
             if len(axes) > 3:
@@ -240,10 +260,11 @@ def update_virtual_controller(gp_data):
             if ry > 0.2:
                 for k in kb_config.get("right_stick_down", []): target_keys.add(resolve_pynput_key(k))
 
-            if mouse_controller and (abs(rx) > 0.03 or abs(ry) > 0.03):
-                dx = int(rx * 40)
-                dy = int(ry * 40)
-                mouse_controller.move(dx, dy)
+            # Hardware raw mouse delta injection for 3D Camera Rotation (GTA V, FPS/TPS)
+            if abs(rx) > 0.03 or abs(ry) > 0.03:
+                dx = int(rx * 25.0)
+                dy = int(ry * 25.0)
+                raw_mouse_move(dx, dy)
                 
             # Direct Button Keyboard & Mouse Mapping
             for sw_idx in range(len(buttons)):
@@ -280,25 +301,20 @@ def update_virtual_controller(gp_data):
                 active_pressed_keys.clear()
                 active_pressed_keys.update(target_keys)
                 
-            # Apply Mouse button clicks and releases
-            if mouse_controller:
-                m_to_press = target_mouse - active_pressed_mouse_buttons
-                m_to_release = active_pressed_mouse_buttons - target_mouse
+            # Apply Mouse button clicks and releases (ctypes raw mouse_event API)
+            m_to_press = target_mouse - active_pressed_mouse_buttons
+            m_to_release = active_pressed_mouse_buttons - target_mouse
+            
+            for m in m_to_release:
+                try: raw_mouse_click(m, False)
+                except Exception: pass
                 
-                for m in m_to_release:
-                    try:
-                        if m == "right": mouse_controller.release(MouseButton.right)
-                        elif m == "left": mouse_controller.release(MouseButton.left)
-                    except Exception: pass
-                    
-                for m in m_to_press:
-                    try:
-                        if m == "right": mouse_controller.press(MouseButton.right)
-                        elif m == "left": mouse_controller.press(MouseButton.left)
-                    except Exception: pass
-                    
-                active_pressed_mouse_buttons.clear()
-                active_pressed_mouse_buttons.update(target_mouse)
+            for m in m_to_press:
+                try: raw_mouse_click(m, True)
+                except Exception: pass
+                
+            active_pressed_mouse_buttons.clear()
+            active_pressed_mouse_buttons.update(target_mouse)
         except Exception as ex:
             pass
 
