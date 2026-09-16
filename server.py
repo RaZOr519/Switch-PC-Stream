@@ -151,17 +151,28 @@ def update_virtual_controller(gp_data):
     # --- 1. XBOX 360 CONTROLLER INJECTION (vgamepad) ---
     if virtual_gamepad:
         try:
+            # Left Joystick (WASD / Movement)
             lx = float(axes[0]) if len(axes) > 0 else 0.0
             ly = float(axes[1]) if len(axes) > 1 else 0.0
-            if abs(lx) < 0.12: lx = 0.0
-            if abs(ly) < 0.12: ly = 0.0
-            virtual_gamepad.left_joystick_float(x_value_float=lx, y_value_float=-ly)
+            if abs(lx) < 0.10: lx = 0.0
+            if abs(ly) < 0.10: ly = 0.0
+            virtual_gamepad.left_joystick(x_value=int(lx * 32767), y_value=int(-ly * 32767))
             
-            rx = float(axes[2]) if len(axes) > 2 else 0.0
-            ry = float(axes[3]) if len(axes) > 3 else 0.0
-            if abs(rx) < 0.12: rx = 0.0
-            if abs(ry) < 0.12: ry = 0.0
-            virtual_gamepad.right_joystick_float(x_value_float=rx, y_value_float=-ry)
+            # Right Joystick (Camera / Aiming) with Fallback Axis Detection
+            rx = 0.0
+            ry = 0.0
+            if len(axes) > 3:
+                rx = float(axes[2])
+                ry = float(axes[3])
+                # WebKit fallback if axes[2]/[3] are trigger axes and axes[4]/[5] are right stick
+                if abs(rx) < 0.05 and len(axes) > 4 and abs(float(axes[4])) > 0.05:
+                    rx = float(axes[4])
+                if abs(ry) < 0.05 and len(axes) > 5 and abs(float(axes[5])) > 0.05:
+                    ry = float(axes[5])
+                    
+            if abs(rx) < 0.10: rx = 0.0
+            if abs(ry) < 0.10: ry = 0.0
+            virtual_gamepad.right_joystick(x_value=int(rx * 32767), y_value=int(-ry * 32767))
             
             # Dynamic Xbox Button Mapping from keymap.json
             for sw_str, xb_name in xb_config.items():
@@ -205,12 +216,29 @@ def update_virtual_controller(gp_data):
             if ly > 0.3:
                 for k in kb_config.get("left_stick_down", []): target_keys.add(resolve_pynput_key(k))
 
-            # Right Stick Mouse Camera Movement
-            rx = float(axes[2]) if len(axes) > 2 else 0.0
-            ry = float(axes[3]) if len(axes) > 3 else 0.0
-            if mouse_controller and (abs(rx) > 0.15 or abs(ry) > 0.15):
-                dx = int(rx * 25)
-                dy = int(ry * 25)
+            # Right Stick Camera Movement (Mouse & Arrow Key Fallbacks)
+            rx = 0.0
+            ry = 0.0
+            if len(axes) > 3:
+                rx = float(axes[2])
+                ry = float(axes[3])
+                if abs(rx) < 0.05 and len(axes) > 4 and abs(float(axes[4])) > 0.05:
+                    rx = float(axes[4])
+                if abs(ry) < 0.05 and len(axes) > 5 and abs(float(axes[5])) > 0.05:
+                    ry = float(axes[5])
+
+            if rx < -0.3:
+                for k in kb_config.get("right_stick_left", []): target_keys.add(resolve_pynput_key(k))
+            if rx > 0.3:
+                for k in kb_config.get("right_stick_right", []): target_keys.add(resolve_pynput_key(k))
+            if ry < -0.3:
+                for k in kb_config.get("right_stick_up", []): target_keys.add(resolve_pynput_key(k))
+            if ry > 0.3:
+                for k in kb_config.get("right_stick_down", []): target_keys.add(resolve_pynput_key(k))
+
+            if mouse_controller and (abs(rx) > 0.10 or abs(ry) > 0.10):
+                dx = int(rx * 35)
+                dy = int(ry * 35)
                 mouse_controller.move(dx, dy)
                 
             # Direct Button Keyboard & Mouse Mapping
