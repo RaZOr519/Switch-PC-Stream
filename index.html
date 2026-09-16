@@ -602,6 +602,16 @@
             }
         }
 
+        // Prevent WebKit physical B button from triggering browser back navigation
+        try {
+            history.pushState(null, null, location.href);
+            window.onpopstate = function () {
+                if (isGameLocked) {
+                    history.pushState(null, null, location.href);
+                }
+            };
+        } catch (e) { }
+
         // Blur spatial navigation focus automatically in Lock Mode
         setInterval(() => {
             if (isGameLocked && document.activeElement && document.activeElement.tagName !== 'BODY') {

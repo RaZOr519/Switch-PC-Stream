@@ -1,0 +1,84 @@
+{
+    "_comment": "Switch Lite Gamepad to Xbox 360 & Keyboard Key Mapping Configuration",
+    "xbox_mapping": {
+        "0": "A",
+        "1": "B",
+        "2": "X",
+        "3": "Y",
+        "4": "LEFT_SHOULDER",
+        "5": "RIGHT_SHOULDER",
+        "8": "BACK",
+        "9": "START",
+        "10": "LEFT_THUMB",
+        "11": "RIGHT_THUMB",
+        "12": "DPAD_UP",
+        "13": "DPAD_DOWN",
+        "14": "DPAD_LEFT",
+        "15": "DPAD_RIGHT"
+    },
+    "keyboard_mapping": {
+        "left_stick_left": [
+            "a",
+            "left"
+        ],
+        "left_stick_right": [
+            "d",
+            "right"
+        ],
+        "left_stick_up": [
+            "w",
+            "up"
+        ],
+        "left_stick_down": [
+            "s",
+            "down"
+        ],
+        "dpad_up": [
+            "up",
+            "w"
+        ],
+        "dpad_down": [
+            "down",
+            "s"
+        ],
+        "dpad_left": [
+            "left",
+            "a"
+        ],
+        "dpad_right": [
+            "right",
+            "d"
+        ],
+        "button_0": [
+            "space",
+            "z"
+        ],
+        "button_1": [
+            "z"
+        ],
+        "button_2": [
+            "x"
+        ],
+        "button_3": [
+            "c"
+        ],
+        "button_4": [
+            "shift"
+        ],
+        "button_5": [
+            "ctrl"
+        ],
+        "button_6": [
+            "space"
+        ],
+        "button_7": [
+            "space"
+        ],
+        "button_8": [
+            "esc"
+        ],
+        "button_9": [
+            "enter"
+        ]
+    }
+}

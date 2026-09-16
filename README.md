@@ -7,7 +7,7 @@
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)
 ![Resolution](https://img.shields.io/badge/Resolution-1280x720%20%40%2060FPS-orange.svg)
 ![Platform](https://img.shields.io/badge/Platform-Nintendo%20Switch%20Lite%20%28Stock%2FUnmodded%29-red.svg)
-[![Ko-fi](https://img.shields.io/badge/Support%20Me-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/razor519)
+[![Ko-fi](https://img.shields.io/badge/Support%20Me-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/sachindewthuru)
 
 ---
 
@@ -130,20 +130,42 @@ python game.py
 
 ---
 
-## 🕹️ Input Mapping Matrix
+## 🕹️ Input Mapping & Customization (`keymap.json`)
 
-| Switch Lite Button | Virtual Xbox 360 Button | Windows Keyboard Fallback |
-|:------------------:|:-----------------------:|:-------------------------:|
-| **Left Stick** | Left Joystick | `W` / `A` / `S` / `D` |
-| **D-Pad** | D-Pad Up / Down / Left / Right | Arrow Keys |
-| **Switch B** | Xbox `A` | `Spacebar` / `Z` |
-| **Switch A** | Xbox `B` | `Z` / `J` |
-| **Switch Y** | Xbox `X` | `X` |
-| **Switch X** | Xbox `Y` | `C` |
-| **Switch L / R** | Shoulder LB / RB | `Shift` |
-| **Switch ZL / ZR** | Triggers LT / RT | `Spacebar` |
-| **Switch - (Minus)** | Back / Select | `Escape` |
-| **Switch + (Plus)** | Start | `Enter` |
+All button and axis mappings are modularly configured in **`keymap.json`**. You can edit `keymap.json` at any time to reassign controls for specific PC games, emulators, or layout preferences:
+
+```json
+{
+  "xbox_mapping": {
+    "0": "A",
+    "1": "B",
+    "2": "X",
+    "3": "Y",
+    "4": "LEFT_SHOULDER",
+    "5": "RIGHT_SHOULDER",
+    "8": "BACK",
+    "9": "START",
+    "12": "DPAD_UP",
+    "13": "DPAD_DOWN",
+    "14": "DPAD_LEFT",
+    "15": "DPAD_RIGHT"
+  },
+  "keyboard_mapping": {
+    "left_stick_left": ["a", "left"],
+    "left_stick_right": ["d", "right"],
+    "left_stick_up": ["w", "up"],
+    "left_stick_down": ["s", "down"],
+    "button_0": ["space", "z"],
+    "button_1": ["z"],
+    "button_2": ["x"],
+    "button_3": ["c"],
+    "button_8": ["esc"],
+    "button_9": ["enter"]
+  }
+}
+```
+
+> **Note on Browser Back Navigation**: `index.html` includes a WebKit `popstate` history trap so that pressing physical Switch buttons (like B) inside Game Lock Mode will **not** trigger WebKit browser back navigation!
 
 ---
 
@@ -161,7 +183,7 @@ This project is an independent open-source research demonstration of low-latency
 
 If you enjoy this project or found it helpful, consider supporting further development on Ko-fi!
 
-<a href="https://ko-fi.com/razor519" target="_blank"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me A Coffee on Ko-fi"></a>
+<a href="https://ko-fi.com/sachindewthuru" target="_blank"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me A Coffee on Ko-fi"></a>
 
 ---
 

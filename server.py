@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import math
+import os
 import time
 import socket
 import struct
@@ -80,10 +81,62 @@ except Exception as e:
 
 active_pressed_keys = set()
 
+KEYMAP_FILE = os.path.join(os.path.dirname(__file__), "keymap.json")
+
+def load_keymap():
+    """Load customizable keymap configuration from keymap.json."""
+    if os.path.exists(KEYMAP_FILE):
+        try:
+            with open(KEYMAP_FILE, "r") as f:
+                data = json.load(f)
+                print(f"[KEYMAP ENGINE] Loaded custom keymap from keymap.json")
+                return data
+        except Exception as e:
+            print(f"[KEYMAP WARNING] Could not parse keymap.json: {e}")
+    return {}
+
+keymap_config = load_keymap()
+
+XBOX_BTN_MAP = {}
+if virtual_gamepad and hasattr(vg, 'XUSB_BUTTON'):
+    XBOX_BTN_MAP = {
+        "A": vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
+        "B": vg.XUSB_BUTTON.XUSB_GAMEPAD_B,
+        "X": vg.XUSB_BUTTON.XUSB_GAMEPAD_X,
+        "Y": vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,
+        "LEFT_SHOULDER": vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER,
+        "RIGHT_SHOULDER": vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER,
+        "BACK": vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK,
+        "START": vg.XUSB_BUTTON.XUSB_GAMEPAD_START,
+        "LEFT_THUMB": vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB,
+        "RIGHT_THUMB": vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB,
+        "DPAD_UP": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_UP,
+        "DPAD_DOWN": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN,
+        "DPAD_LEFT": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_LEFT,
+        "DPAD_RIGHT": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT
+    }
+
+def resolve_pynput_key(key_str):
+    k = str(key_str).lower()
+    special = {
+        "left": Key.left, "right": Key.right, "up": Key.up, "down": Key.down,
+        "space": Key.space, "esc": Key.esc, "enter": Key.enter,
+        "shift": Key.shift, "ctrl": Key.ctrl, "alt": Key.alt, "tab": Key.tab
+    }
+    return special.get(k, k)
+
 def update_virtual_controller(gp_data):
-    """Translate Switch Lite Gamepad API data to Virtual Xbox 360 Controller AND Windows Keyboard Events."""
+    """Translate Switch Lite Gamepad API data to Virtual Xbox 360 Controller AND Windows Keyboard Events via keymap.json."""
     axes = gp_data.get("axes", [0, 0, 0, 0])
     buttons = gp_data.get("buttons", [])
+    
+    # Reload keymap if modified
+    global keymap_config
+    if not keymap_config:
+        keymap_config = load_keymap()
+        
+    xb_config = keymap_config.get("xbox_mapping", {})
+    kb_config = keymap_config.get("keyboard_mapping", {})
     
     # --- 1. XBOX 360 CONTROLLER INJECTION (vgamepad) ---
     if virtual_gamepad:
@@ -100,28 +153,18 @@ def update_virtual_controller(gp_data):
             if abs(ry) < 0.12: ry = 0.0
             virtual_gamepad.right_joystick_float(x_value_float=rx, y_value_float=-ry)
             
-            button_map = {
-                0: vg.XUSB_BUTTON.XUSB_GAMEPAD_A,          # Switch B -> Xbox A
-                1: vg.XUSB_BUTTON.XUSB_GAMEPAD_B,          # Switch A -> Xbox B
-                2: vg.XUSB_BUTTON.XUSB_GAMEPAD_X,          # Switch Y -> Xbox X
-                3: vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,          # Switch X -> Xbox Y
-                4: vg.XUSB_BUTTON.XUSB_LEFT_SHOULDER,      # Switch L -> Xbox LB
-                5: vg.XUSB_BUTTON.XUSB_RIGHT_SHOULDER,     # Switch R -> Xbox RB
-                8: vg.XUSB_BUTTON.XUSB_BACK,               # Switch - -> Xbox BACK
-                9: vg.XUSB_BUTTON.XUSB_START,              # Switch + -> Xbox START
-                10: vg.XUSB_BUTTON.XUSB_LEFT_THUMB,        # Switch L3 -> Xbox LS
-                11: vg.XUSB_BUTTON.XUSB_RIGHT_THUMB,       # Switch R3 -> Xbox RS
-                12: vg.XUSB_BUTTON.XUSB_DPAD_UP,           # D-Pad Up
-                13: vg.XUSB_BUTTON.XUSB_DPAD_DOWN,         # D-Pad Down
-                14: vg.XUSB_BUTTON.XUSB_DPAD_LEFT,         # D-Pad Left
-                15: vg.XUSB_BUTTON.XUSB_DPAD_RIGHT         # D-Pad Right
-            }
-            
-            for sw_idx, xbox_btn in button_map.items():
-                if sw_idx < len(buttons) and buttons[sw_idx]:
-                    virtual_gamepad.press_button(button=xbox_btn)
-                else:
-                    virtual_gamepad.release_button(button=xbox_btn)
+            # Dynamic Xbox Button Mapping from keymap.json
+            for sw_str, xb_name in xb_config.items():
+                try:
+                    sw_idx = int(sw_str)
+                    xbox_btn = XBOX_BTN_MAP.get(xb_name)
+                    if xbox_btn:
+                        if sw_idx < len(buttons) and buttons[sw_idx]:
+                            virtual_gamepad.press_button(button=xbox_btn)
+                        else:
+                            virtual_gamepad.release_button(button=xbox_btn)
+                except Exception:
+                    pass
                     
             zl_pressed = (len(buttons) > 6 and buttons[6]) or (len(axes) > 4 and axes[4] > 0.5)
             zr_pressed = (len(buttons) > 7 and buttons[7]) or (len(axes) > 5 and axes[5] > 0.5)
@@ -141,34 +184,23 @@ def update_virtual_controller(gp_data):
             lx = float(axes[0]) if len(axes) > 0 else 0.0
             ly = float(axes[1]) if len(axes) > 1 else 0.0
             
-            # Left / Right (Stick or D-Pad)
-            if lx < -0.3 or (len(buttons) > 14 and buttons[14]):
-                target_keys.add(Key.left)
-                target_keys.add('a')
-            if lx > 0.3 or (len(buttons) > 15 and buttons[15]):
-                target_keys.add(Key.right)
-                target_keys.add('d')
+            # Left Stick & D-Pad Keyboard Mapping
+            if lx < -0.3:
+                for k in kb_config.get("left_stick_left", []): target_keys.add(resolve_pynput_key(k))
+            if lx > 0.3:
+                for k in kb_config.get("left_stick_right", []): target_keys.add(resolve_pynput_key(k))
+            if ly < -0.3:
+                for k in kb_config.get("left_stick_up", []): target_keys.add(resolve_pynput_key(k))
+            if ly > 0.3:
+                for k in kb_config.get("left_stick_down", []): target_keys.add(resolve_pynput_key(k))
                 
-            # Up / Down (Stick or D-Pad)
-            if ly < -0.3 or (len(buttons) > 12 and buttons[12]):
-                target_keys.add(Key.up)
-                target_keys.add('w')
-            if ly > 0.3 or (len(buttons) > 13 and buttons[13]):
-                target_keys.add(Key.down)
-                target_keys.add('s')
-                
-            # Action Buttons
-            if (len(buttons) > 0 and buttons[0]) or (len(buttons) > 1 and buttons[1]) or (len(buttons) > 7 and buttons[7]):
-                target_keys.add(Key.space)
-                target_keys.add('z')
-            if (len(buttons) > 2 and buttons[2]) or (len(buttons) > 3 and buttons[3]):
-                target_keys.add('x')
-                target_keys.add('c')
-            if len(buttons) > 8 and buttons[8]: # - (Minus)
-                target_keys.add(Key.esc)
-            if len(buttons) > 9 and buttons[9]: # + (Plus)
-                target_keys.add(Key.enter)
-                
+            # Direct Button Keyboard Mapping
+            for sw_idx in range(len(buttons)):
+                if buttons[sw_idx]:
+                    btn_keys = kb_config.get(f"button_{sw_idx}", [])
+                    for k in btn_keys:
+                        target_keys.add(resolve_pynput_key(k))
+                        
             # Apply key presses and releases
             keys_to_press = target_keys - active_pressed_keys
             keys_to_release = active_pressed_keys - target_keys
